@@ -1,1 +1,12 @@
 API_PREFIX: /api
+DATABASE_URL:
+  Fn::Sub:
+    - 'postgresql+psycopg://${DbUser}:${DbPassword}@${DbHost}:${DbPort}/${DbName}'
+    - DbUser: '{{resolve:secretsmanager:turfbook/notifications/dev/db:SecretString:username}}'
+      DbPassword: '{{resolve:secretsmanager:turfbook/notifications/dev/db:SecretString:password}}'
+      DbName: '{{resolve:secretsmanager:turfbook/notifications/dev/db:SecretString:dbname}}'
+      DbHost: ${ssm:/turfbook/dev/db_host}
+      DbPort: ${ssm:/turfbook/dev/db_port}
+SES_SENDER: ${ssm:/turfbook/notifications/dev/ses_sender}
+DLQ_URL:
+  Ref: NoticesDeadLetterQueue

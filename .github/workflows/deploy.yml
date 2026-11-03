@@ -22,6 +22,11 @@ jobs:
     concurrency:
       group: deploy-dev
       cancel-in-progress: false
+    env:
+      # This service declares a database: remove these to skip provisioning.
+      DB_SECRET_NAME: turfbook/notifications/dev/db
+      DB_PROVISIONER_FUNCTION: turfbook-platform-dev-db-provisioner
+      DB_PROVISIONED_PARAM: /turfbook/notifications/dev/db_provisioned
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -43,7 +48,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Provision database
+        if: env.DB_SECRET_NAME != ''
+        run: scripts/ci/provision_database.sh
+
       - name: Deploy
-        run: npx serverless deploy --stage dev
+        run: >-
+          npx serverless deploy --stage dev
+          --param="migrationsHash=${{ hashFiles('alembic/versions/**') }}"
         env:
           SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}

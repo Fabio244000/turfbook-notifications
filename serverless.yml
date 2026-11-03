@@ -1,6 +1,13 @@
 service: turfbook-notifications
 frameworkVersion: '~4.43.0'
 
+stages:
+  default:
+    params:
+      privateSubnetA: subnet-0163ffcf34770d937
+      privateSubnetB: subnet-0f44784a3de31da43
+      lambdaDbSecurityGroup: sg-094dae12950b8a2e9
+
 provider:
   name: aws
   runtime: python3.12
@@ -30,6 +37,8 @@ package:
     - '!./**'
     - 'app/**'
     - 'config/**'
+    - 'alembic/**'
+    - 'alembic.ini'
 
 functions:
   api:
@@ -40,4 +49,47 @@ functions:
       - httpApi: '*'
     timeout: 15
 
-resources: ${file(./deploy/resources/http-api.yml)}
+  notifier:
+    handler: app.user_notification.infrastructure.queue.handler.handler
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
+    timeout: 10
+    vpc:
+      subnetIds:
+        - ${param:privateSubnetA}
+        - ${param:privateSubnetB}
+      securityGroupIds:
+        - ${param:lambdaDbSecurityGroup}
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [NoticesQueue, Arn]
+          batchSize: 1
+    iam:
+      role:
+        statements:
+          - Effect: Allow
+            Action: sqs:SendMessage
+            Resource:
+              Fn::GetAtt: [NoticesDeadLetterQueue, Arn]
+          - Effect: Allow
+            Action: ses:SendEmail
+            Resource: arn:aws:ses:${aws:region}:${aws:accountId}:identity/${ssm:/turfbook/notifications/${sls:stage}/ses_sender}
+
+  migrate:
+    handler: app.migrations.handler.handler
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
+    timeout: 30
+    maximumRetryAttempts: 0
+    vpc:
+      subnetIds:
+        - ${param:privateSubnetA}
+        - ${param:privateSubnetB}
+      securityGroupIds:
+        - ${param:lambdaDbSecurityGroup}
+
+resources:
+  - ${file(./deploy/resources/http-api.yml)}
+  - ${file(./deploy/resources/migrations.yml)}
+  - ${file(./deploy/resources/notices.yml)}
