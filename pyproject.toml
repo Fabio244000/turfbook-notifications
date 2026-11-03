@@ -1,0 +1,51 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = [
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "N",
+    "B",
+    "C4",
+    "SIM",
+    "UP",
+    "PLR0915",
+]
+
+ignore = [
+    "E501",
+    "B008",
+]
+
+[tool.ruff.lint.pylint]
+max-statements = 15
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["app.user_notification.infrastructure.*", "config.*"]
+disable_error_code = ["misc", "no-any-return", "untyped-decorator", "call-arg"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+check_untyped_defs = false
+disable_error_code = ["attr-defined", "no-untyped-call"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
