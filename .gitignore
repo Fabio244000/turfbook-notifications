@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Node / Serverless
+node_modules/
+.serverless/
+
+# Claude (local only)
+CLAUDE.md
+
+# Tickets (local only)
+tickets/
+
+# Task lists (local only)
+docs/
