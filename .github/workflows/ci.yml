@@ -19,6 +19,24 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: turfbook
+          POSTGRES_PASSWORD: turfbook
+          POSTGRES_DB: notifications
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://turfbook:turfbook@localhost:5432/notifications
+      SES_SENDER: turfbook@gmail.com
+      DLQ_URL: https://sqs.us-east-1.amazonaws.com/000000000000/ci-notices-dlq
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -38,6 +56,9 @@ jobs:
 
       - name: Pre-commit hooks
         run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Migrations
+        run: alembic upgrade head
 
       - name: Tests
         run: pytest

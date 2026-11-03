@@ -1,0 +1,12 @@
+Resources:
+  MigrationTrigger:
+    Type: Custom::Migration
+    Properties:
+      ServiceToken:
+        Fn::GetAtt: [MigrateLambdaFunction, Arn]
+      ServiceTimeout: 120
+      MigrationsHash: ${param:migrationsHash, sls:instanceId}
+extensions:
+  NotifierLambdaFunction:
+    DependsOn:
+      - MigrationTrigger

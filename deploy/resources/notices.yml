@@ -1,0 +1,60 @@
+Resources:
+  NoticesTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: turfbook-notifications-${sls:stage}-notices
+      KmsMasterKeyId: alias/aws/sns
+
+  NoticesQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: turfbook-notifications-${sls:stage}-notices
+      SqsManagedSseEnabled: true
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt: [NoticesDeadLetterQueue, Arn]
+        maxReceiveCount: 5
+
+  NoticesDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: turfbook-notifications-${sls:stage}-notices-dlq
+      SqsManagedSseEnabled: true
+
+  NoticesSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn:
+        Ref: NoticesTopic
+      Protocol: sqs
+      Endpoint:
+        Fn::GetAtt: [NoticesQueue, Arn]
+      RawMessageDelivery: true
+
+  NoticesQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - Ref: NoticesQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource:
+              Fn::GetAtt: [NoticesQueue, Arn]
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  Ref: NoticesTopic
+
+  NoticesTopicArnParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /turfbook/notifications/${sls:stage}/topic_arn
+      Type: String
+      Value:
+        Ref: NoticesTopic
