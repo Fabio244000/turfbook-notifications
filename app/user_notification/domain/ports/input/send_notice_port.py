@@ -17,6 +17,7 @@ class SendNoticeCommand:
     email: str | None = None
     cellphone: str | None = None
     first_name: str | None = None
+    code: str | None = None
 
 
 class SendNoticePort(ABC):

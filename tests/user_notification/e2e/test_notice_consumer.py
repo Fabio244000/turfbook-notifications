@@ -145,3 +145,51 @@ class TestNoticeConsumer:
 
         with pytest.raises(TimeoutError):
             await queue.deliver('not a json')
+
+
+CODE = '482913'
+CODE_BODY = 'Hola Rosa, tu código es {code}. Vence en 5 minutos.'
+
+
+async def _stored_bodies(connection: AsyncConnection, notice_id: str) -> set[str]:
+    """The bodies recorded for the notice, read with plain SQL."""
+    result = await connection.execute(
+        text('SELECT body FROM notifications WHERE notice_id = :id'),
+        {'id': UUID(notice_id)},
+    )
+    return {row.body for row in result}
+
+
+class TestNoticeConsumerWithCode:
+    async def test_the_code_is_sent_but_recorded_masked(
+        self, queue: _Queue, connection: AsyncConnection
+    ) -> None:
+        notice = _notice(body=CODE_BODY, code=CODE)
+
+        await queue.deliver(json.dumps(notice))
+
+        assert queue.email.sent[0].body == CODE_BODY.replace('{code}', CODE)
+        assert await _stored_bodies(connection, notice['notice_id']) == {
+            CODE_BODY.replace('{code}', '******')
+        }
+
+    @pytest.mark.parametrize(
+        ('code', 'body'),
+        [('48291', CODE_BODY), (482913, CODE_BODY), (CODE, 'Hola Rosa, sin marcador.')],
+        ids=['five digits', 'a number, not text', 'without the placeholder'],
+    )
+    async def test_a_malformed_code_goes_to_the_dlq_and_is_not_logged(
+        self,
+        queue: _Queue,
+        caplog: pytest.LogCaptureFixture,
+        code: Any,
+        body: str,
+    ) -> None:
+        message = json.dumps(_notice(body=body, code=code))
+
+        await queue.deliver(message)
+
+        assert queue.dead_letters.sent == [message]
+        assert 'Malformed notice sent to the DLQ' in caplog.text
+        assert str(code) not in caplog.text
+        assert queue.email.sent == queue.sms.sent == []

@@ -6,6 +6,7 @@ import pytest
 from botocore.config import Config
 from botocore.stub import Stubber
 
+from app.user_notification.domain.entities.outgoing_message import OutgoingMessage
 from app.user_notification.domain.exceptions import (
     DeliveryRejectedError,
     DeliveryUnavailableError,
@@ -17,6 +18,11 @@ from app.user_notification.infrastructure.channels.ses_email_sender import (
 
 SENDER = 'turfbook@gmail.com'
 REGION = 'us-east-1'
+MESSAGE = OutgoingMessage(
+    destination='rosa@gmail.com',
+    subject='Tu código de seguridad de TurfBook',
+    body='Hola Rosa, tu código es 482913. Vence en 5 minutos.',
+)
 
 
 def _client(**kwargs: Any) -> Any:
@@ -40,29 +46,24 @@ def ses() -> Iterator[tuple[SesEmailSender, Stubber]]:
 
 
 class TestSesEmailSender:
-    async def test_sends_the_notification_as_a_plain_text_email(
-        self, ses, new_notification
-    ):
+    async def test_sends_the_message_as_a_plain_text_email(self, ses):
         sender, stubber = ses
-        notification = new_notification()
         stubber.add_response(
             'send_email',
             {'MessageId': 'message-1'},
             expected_params={
                 'FromEmailAddress': SENDER,
-                'Destination': {'ToAddresses': [notification.destination]},
+                'Destination': {'ToAddresses': [MESSAGE.destination]},
                 'Content': {
                     'Simple': {
-                        'Subject': {'Data': notification.subject, 'Charset': 'UTF-8'},
-                        'Body': {
-                            'Text': {'Data': notification.body, 'Charset': 'UTF-8'}
-                        },
+                        'Subject': {'Data': MESSAGE.subject, 'Charset': 'UTF-8'},
+                        'Body': {'Text': {'Data': MESSAGE.body, 'Charset': 'UTF-8'}},
                     }
                 },
             },
         )
 
-        await sender.send(notification)
+        await sender.send(MESSAGE)
 
     @pytest.mark.parametrize(
         'code',
@@ -73,14 +74,12 @@ class TestSesEmailSender:
             'NotFoundException',
         ],
     )
-    async def test_a_rejection_of_the_email_is_permanent(
-        self, ses, new_notification, code
-    ):
+    async def test_a_rejection_of_the_email_is_permanent(self, ses, code):
         sender, stubber = ses
         stubber.add_client_error('send_email', service_error_code=code)
 
         with pytest.raises(DeliveryRejectedError, match=code):
-            await sender.send(new_notification())
+            await sender.send(MESSAGE)
 
     @pytest.mark.parametrize(
         'code',
@@ -91,16 +90,14 @@ class TestSesEmailSender:
             'AccountSuspendedException',
         ],
     )
-    async def test_throttling_or_a_paused_account_is_temporary(
-        self, ses, new_notification, code
-    ):
+    async def test_throttling_or_a_paused_account_is_temporary(self, ses, code):
         sender, stubber = ses
         stubber.add_client_error('send_email', service_error_code=code)
 
         with pytest.raises(DeliveryUnavailableError, match=code):
-            await sender.send(new_notification())
+            await sender.send(MESSAGE)
 
-    async def test_an_unreachable_ses_is_temporary(self, new_notification):
+    async def test_an_unreachable_ses_is_temporary(self):
         closed_port = 'http://127.0.0.1:9'
         client = _client(
             endpoint_url=closed_port,
@@ -109,7 +106,7 @@ class TestSesEmailSender:
         sender = SesEmailSender(client=client, sender=SENDER)
 
         with pytest.raises(DeliveryUnavailableError):
-            await sender.send(new_notification())
+            await sender.send(MESSAGE)
 
 
 class TestBuildSesClient:

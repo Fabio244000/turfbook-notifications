@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.user_notification.domain.entities.channel import Channel
 from app.user_notification.domain.entities.notification import Notification
+from app.user_notification.domain.entities.outgoing_message import OutgoingMessage
 from app.user_notification.domain.exceptions import DomainError
 from app.user_notification.domain.ports.output.channel_sender_port import (
     ChannelSenderPort,
@@ -70,13 +71,13 @@ class FakeChannelSender(ChannelSenderPort):
     """Records what it sends; `fail_with` makes the next sends raise that error."""
 
     def __init__(self) -> None:
-        self.sent: list[Notification] = []
+        self.sent: list[OutgoingMessage] = []
         self.fail_with: DomainError | None = None
 
-    async def send(self, notification: Notification) -> None:
+    async def send(self, message: OutgoingMessage) -> None:
         if self.fail_with is not None:
             raise self.fail_with
-        self.sent.append(replace(notification))
+        self.sent.append(message)
 
 
 class FakeClock(ClockPort):

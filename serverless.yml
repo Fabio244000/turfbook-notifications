@@ -74,7 +74,7 @@ functions:
               Fn::GetAtt: [NoticesDeadLetterQueue, Arn]
           - Effect: Allow
             Action: ses:SendEmail
-            Resource: arn:aws:ses:${aws:region}:${aws:accountId}:identity/${ssm:/turfbook/notifications/${sls:stage}/ses_sender}
+            Resource: arn:aws:ses:${aws:region}:${aws:accountId}:identity/*
 
   migrate:
     handler: app.migrations.handler.handler

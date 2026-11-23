@@ -5,7 +5,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-from app.user_notification.domain.entities.notification import Notification
+from app.user_notification.domain.entities.outgoing_message import OutgoingMessage
 from app.user_notification.domain.exceptions import (
     DeliveryRejectedError,
     DeliveryUnavailableError,
@@ -48,9 +48,9 @@ class SesEmailSender(ChannelSenderPort):
         self._client = client
         self._sender = sender
 
-    async def send(self, notification: Notification) -> None:
+    async def send(self, message: OutgoingMessage) -> None:
         try:
-            await asyncio.to_thread(self._send_email, notification)
+            await asyncio.to_thread(self._send_email, message)
         except ClientError as error:
             raise _delivery_error(error) from error
         except BotoCoreError as error:
@@ -58,14 +58,14 @@ class SesEmailSender(ChannelSenderPort):
                 SES_UNREACHABLE.format(error=error)
             ) from error
 
-    def _send_email(self, notification: Notification) -> None:
+    def _send_email(self, message: OutgoingMessage) -> None:
         self._client.send_email(
             FromEmailAddress=self._sender,
-            Destination={'ToAddresses': [notification.destination]},
+            Destination={'ToAddresses': [message.destination]},
             Content={
                 'Simple': {
-                    'Subject': {'Data': notification.subject, 'Charset': CHARSET},
-                    'Body': {'Text': {'Data': notification.body, 'Charset': CHARSET}},
+                    'Subject': {'Data': message.subject, 'Charset': CHARSET},
+                    'Body': {'Text': {'Data': message.body, 'Charset': CHARSET}},
                 }
             },
         )

@@ -62,7 +62,7 @@ class SendNoticeUseCase(SendNoticePort):
         if notification is None:
             return
         try:
-            await self._senders[channel].send(notification)
+            await self._senders[channel].send(notice.outgoing(channel))
         except DeliveryRejectedError as error:
             await self._finish(notification, now, sent=False)
             _log(notification, RESULT_REJECTED, error)
@@ -115,6 +115,7 @@ def _notice(command: SendNoticeCommand) -> Notice:
         ),
         subject=command.subject,
         body=command.body,
+        code=command.code,
     )
 
 

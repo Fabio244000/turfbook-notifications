@@ -32,6 +32,10 @@ EMAIL = 'luis.h@gmail.com'
 CELLPHONE = '+51987654321'
 SUBJECT = 'Tu cuenta de TurfBook fue bloqueada'
 BODY = 'Hola Luis, tu cuenta de TurfBook fue bloqueada por 5 intentos fallidos.'
+CODE = '482913'
+CODE_BODY = 'Hola Luis, tu código es {code}. Vence en 5 minutos.'
+SENT_BODY = 'Hola Luis, tu código es 482913. Vence en 5 minutos.'
+MASKED_BODY = 'Hola Luis, tu código es ******. Vence en 5 minutos.'
 
 
 def _command(**overrides: Any) -> SendNoticeCommand:
@@ -208,6 +212,15 @@ class TestSendNoticeRules:
             ({'subject': 'a' * 251}, 'subject must have between 1 and 250'),
             ({'body': ''}, 'body must have between 1 and 4000'),
             ({'body': 'a' * 4001}, 'body must have between 1 and 4000'),
+            ({'body': CODE_BODY, 'code': '48291'}, 'code is invalid'),
+            ({'body': CODE_BODY, 'code': '48291a'}, 'code is invalid'),
+            ({'code': CODE}, 'body must contain'),
+            ({'body': f'{CODE_BODY} {{code}}', 'code': CODE}, 'body must contain'),
+            ({'body': CODE_BODY}, 'body cannot contain'),
+            (
+                {'subject': 'Tu código {code}', 'body': CODE_BODY, 'code': CODE},
+                'subject cannot contain',
+            ),
         ],
     )
     async def test_rejects_a_malformed_notice_without_sending_or_recording(
@@ -226,3 +239,64 @@ class TestSendNoticeRules:
             )
 
         assert raised.value.errors == ('email is invalid.', 'cellphone is invalid.')
+
+    async def test_no_rule_error_reveals_the_code(self, service: _Service) -> None:
+        with pytest.raises(InvalidNoticeError) as raised:
+            await service.use_case.execute(_command(code='48291'))
+
+        assert '48291' not in str(raised.value)
+
+
+class TestSendNoticeWithCode:
+    async def test_sends_the_code_in_place_of_the_placeholder(
+        self, service: _Service
+    ) -> None:
+        command = _command(body=CODE_BODY, code=CODE)
+
+        await service.use_case.execute(command)
+
+        assert [m.body for m in service.email.sent] == [SENT_BODY]
+        assert [m.body for m in service.sms.sent] == [SENT_BODY]
+        assert service.email.sent[0].destination == EMAIL
+        assert service.sms.sent[0].destination == CELLPHONE
+
+    async def test_records_the_body_with_the_code_masked(
+        self, service: _Service
+    ) -> None:
+        command = _command(body=CODE_BODY, code=CODE)
+
+        await service.use_case.execute(command)
+
+        assert service.stored(command, Channel.EMAIL).body == MASKED_BODY
+        assert service.stored(command, Channel.SMS).body == MASKED_BODY
+
+    async def test_logs_the_body_with_the_code_masked(
+        self, service: _Service, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+
+        await service.use_case.execute(_command(body=CODE_BODY, code=CODE))
+
+        assert MASKED_BODY in caplog.text
+        assert CODE not in caplog.text
+
+    async def test_a_retry_sends_the_real_code_again(self, service: _Service) -> None:
+        command = _command(body=CODE_BODY, code=CODE)
+        service.email.fail_with = DeliveryUnavailableError('timeout')
+        with pytest.raises(DeliveryUnavailableError):
+            await service.use_case.execute(command)
+        service.email.fail_with = None
+
+        await service.use_case.execute(command)
+
+        assert [m.body for m in service.email.sent] == [SENT_BODY]
+
+    async def test_a_notice_without_code_is_sent_and_recorded_as_is(
+        self, service: _Service
+    ) -> None:
+        command = _command()
+
+        await service.use_case.execute(command)
+
+        assert service.email.sent[0].body == BODY
+        assert service.stored(command, Channel.EMAIL).body == BODY
