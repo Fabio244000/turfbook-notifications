@@ -41,7 +41,7 @@ class Notification:
             channel=channel,
             destination=notice.destination(channel),
             subject=notice.subject,
-            body=notice.body,
+            body=notice.recorded_body,
             created_at=now,
             updated_at=now,
         )

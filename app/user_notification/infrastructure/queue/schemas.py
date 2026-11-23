@@ -24,6 +24,7 @@ class NoticeMessage(BaseModel):
     recipient: RecipientMessage
     subject: str
     body: str
+    code: str | None = None
 
     def to_command(self) -> SendNoticeCommand:
         return SendNoticeCommand(
@@ -35,4 +36,5 @@ class NoticeMessage(BaseModel):
             email=self.recipient.email,
             cellphone=self.recipient.cellphone,
             first_name=self.recipient.first_name,
+            code=self.code,
         )
