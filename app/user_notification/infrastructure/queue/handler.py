@@ -27,10 +27,11 @@ from app.user_notification.infrastructure.queue.sqs_dead_letter_sender import (
 )
 from config.settings import settings
 
-# The delivery log of each channel is INFO (CA8).
+# The delivery log of each channel is INFO, below the root logger's default level
+# (WARNING).
 logging.getLogger().setLevel(logging.INFO)
 
-# One event loop for the life of the execution environment (D2): the module-level
+# One event loop for the life of the execution environment: the module-level
 # engine keeps its connections on it across warm invocations.
 _runner = asyncio.Runner()
 

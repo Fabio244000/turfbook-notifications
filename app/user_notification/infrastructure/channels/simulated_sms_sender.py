@@ -5,7 +5,7 @@ from app.user_notification.domain.ports.output.channel_sender_port import (
 
 
 class SimulatedSmsSender(ChannelSenderPort):
-    """No SMS provider yet (§2): the delivery always succeeds and the use case's log
+    """No SMS provider yet: the delivery always succeeds and the use case's log
     is its evidence."""
 
     async def send(self, message: OutgoingMessage) -> None:

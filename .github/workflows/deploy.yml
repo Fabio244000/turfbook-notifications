@@ -1,60 +1,39 @@
 name: Deploy
 
+# On push to develop (a merged pull request), or by hand to redeploy an earlier commit of
+# develop. CI first; then the shared deploy: verify, change, roll back on failure.
 on:
   push:
     branches: [develop]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit of develop to redeploy (the full 40-character SHA)
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml
+    # Whole suite with coverage. actionlint 1.7.12 does not accept the '$/'
+    # self-repository syntax yet.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    with:
+      ref: ${{ inputs.sha }}
 
   deploy:
     needs: ci
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: dev
     permissions:
       contents: read
-      id-token: write
-    concurrency:
-      group: deploy-dev
-      cancel-in-progress: false
-    env:
-      # This service declares a database: remove these to skip provisioning.
-      DB_SECRET_NAME: turfbook/notifications/dev/db
-      DB_PROVISIONER_FUNCTION: turfbook-platform-dev-db-provisioner
-      DB_PROVISIONED_PARAM: /turfbook/notifications/dev/db_provisioned
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Install deploy tooling
-        run: npm ci
-
-      # The runner is x86_64; dockerizePip builds the layer for arm64.
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        with:
-          platforms: arm64
-
-      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Provision database
-        if: env.DB_SECRET_NAME != ''
-        run: scripts/ci/provision_database.sh
-
-      - name: Deploy
-        run: >-
-          npx serverless deploy --stage dev
-          --param="migrationsHash=${{ hashFiles('alembic/versions/**') }}"
-        env:
-          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+      id-token: write # OIDC: assume the deploy role, no long-lived AWS keys
+    uses: Fabio244000/turfbook-workflows/.github/workflows/serverless-deploy.yml@b9077a3bb031a2fb2ca997e71c36669567e5a71b # main
+    with:
+      stage: dev
+      service: notifications
+      db-secret: turfbook/notifications/dev/db
+      ref: ${{ inputs.sha }}
+    secrets:
+      SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}

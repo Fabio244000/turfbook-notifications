@@ -19,6 +19,18 @@ repos:
         args: [ --fix ]
       - id: ruff-format
 
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.32.0
+    hooks:
+      - id: zizmor
+        # pedantic: also rejects broad permissions (write-all); --no-progress is the hook's default.
+        args: [--no-progress, --persona=pedantic]
+
   - repo: local
     hooks:
       - id: mypy

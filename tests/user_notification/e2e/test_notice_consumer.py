@@ -28,7 +28,7 @@ NOW = datetime(2026, 11, 2, 12, 0, tzinfo=UTC)
 
 
 def _notice(**overrides: Any) -> dict[str, Any]:
-    """The contract's notice (§5), as SNS delivers it in the SQS body."""
+    """A valid notice, as SNS delivers it in the SQS body."""
     notice: dict[str, Any] = {
         'notice_id': str(uuid4()),
         'notifiers': ['email', 'sms'],
