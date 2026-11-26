@@ -1,5 +1,5 @@
 service: turfbook-notifications
-frameworkVersion: '~4.43.0'
+frameworkVersion: '~4.46.0'
 
 stages:
   default:
@@ -13,6 +13,10 @@ provider:
   runtime: python3.12
   architecture: arm64
   region: us-east-1
+  # The deploy disables it only when it brings new migrations, to undo them with the new
+  # code before rolling back; otherwise CloudFormation rolls back by itself, which also
+  # allows replacing a resource such as the layer.
+  disableRollback: ${strToBool(${param:disableRollback, 'true'})}
   logRetentionInDays: 7
   stackTags:
     project: turfbook
@@ -21,6 +25,9 @@ provider:
   httpApi:
     payload: '2.0'
   iam:
+    # CloudFormation creates the stack's resources with the service's own deploy role;
+    # the CI role only passes it.
+    deploymentRole: arn:aws:iam::${aws:accountId}:role/turfbook-deploy-notifications-cfn
     role:
       mode: perFunction
       permissionsBoundary: arn:aws:iam::${aws:accountId}:policy/turfbook-lambda-boundary

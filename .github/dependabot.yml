@@ -1,3 +1,5 @@
+# Weekly updates to develop, one grouped PR per ecosystem, never for a version released
+# less than 7 days ago.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -5,3 +7,41 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      pip:
+        patterns: ['*']
+
+  - package-ecosystem: pre-commit
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        patterns: ['*']

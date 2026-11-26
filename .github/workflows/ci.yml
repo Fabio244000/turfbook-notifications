@@ -1,12 +1,16 @@
 name: CI
 
+# Only on pull requests and inside deploy.yml: a push to a branch with an open pull
+# request would otherwise run it twice.
 on:
   pull_request:
     branches: [develop, main]
-  push:
-    # develop runs CI inside deploy.yml (workflow_call), not twice.
-    branches-ignore: [develop]
   workflow_call:
+    inputs:
+      ref:
+        description: Commit to test; empty for the commit of the event (a redeploy passes an earlier one).
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -16,49 +20,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: turfbook
-          POSTGRES_PASSWORD: turfbook
-          POSTGRES_DB: notifications
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql+psycopg://turfbook:turfbook@localhost:5432/notifications
-      SES_SENDER: turfbook@gmail.com
-      DLQ_URL: https://sqs.us-east-1.amazonaws.com/000000000000/ci-notices-dlq
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements/*.txt
-
-      - name: Install dependencies
-        run: pip install -r requirements/local.txt
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-
-      - name: Pre-commit hooks
-        run: pre-commit run --all-files --show-diff-on-failure
-
-      - name: Migrations
-        run: alembic upgrade head
-
-      - name: Tests
-        run: pytest
+  # The jobs are shared; the service passes only its data: postgres-db, ci-env,
+  # setup-script.
+  ci:
+    uses: Fabio244000/turfbook-workflows/.github/workflows/python-ci.yml@b9077a3bb031a2fb2ca997e71c36669567e5a71b # main
+    with:
+      postgres-db: notifications
+      ci-env: |
+        SES_SENDER=turfbook@gmail.com
+        DLQ_URL=https://sqs.us-east-1.amazonaws.com/000000000000/ci-notices-dlq
+      ref: ${{ inputs.ref }}

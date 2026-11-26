@@ -11,7 +11,7 @@ from app.migrations.alembic_migrator import (
     DatabaseNotReadyError,
 )
 from app.migrations.custom_resource import handle_migration_event
-from app.migrations.handler import ALEMBIC_INIT_PATH
+from app.migrations.handler import ALEMBIC_INI_PATH
 from config.settings import settings
 from tests.fakes.migrations import FakeResponseSender
 
@@ -30,12 +30,24 @@ class TestAlembicMigrator:
             'RequestId': 'request-123',
             'LogicalResourceId': 'MigrationTrigger',
         }
-        migrator, sender = AlembicMigrator(ALEMBIC_INIT_PATH), FakeResponseSender()
+        migrator, sender = AlembicMigrator(ALEMBIC_INI_PATH), FakeResponseSender()
 
         handle_migration_event(event, migrator, sender)
         handle_migration_event(event, migrator, sender)
 
         assert [body['Status'] for _, body in sender.sent] == ['SUCCESS', 'SUCCESS']
+
+    def test_every_migration_can_be_undone_and_applied_again(self) -> None:
+        # The deploy undoes the migrations when it fails: every revision needs a
+        # downgrade() that works. Ends at the head again.
+        migrator = AlembicMigrator(ALEMBIC_INI_PATH)
+        migrator.upgrade()
+        head = migrator.current()
+
+        assert migrator.downgrade('base') is None
+        migrator.upgrade()
+
+        assert migrator.current() == head
 
     def test_reports_a_clear_error_when_the_database_is_not_provisioned(
         self, monkeypatch: pytest.MonkeyPatch
@@ -47,7 +59,7 @@ class TestAlembicMigrator:
         )
 
         with pytest.raises(DatabaseNotReadyError, match=DATABASE_NOT_READY_MESSAGE):
-            AlembicMigrator(ALEMBIC_INIT_PATH).upgrade()
+            AlembicMigrator(ALEMBIC_INI_PATH).upgrade()
 
     def test_lets_any_other_error_pass_through(self, tmp_path: Path) -> None:
         ini_without_scripts = tmp_path / 'alembic.ini'

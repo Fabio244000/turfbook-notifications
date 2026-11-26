@@ -16,7 +16,7 @@ class RecipientMessage(BaseModel):
 
 
 class NoticeMessage(BaseModel):
-    """The structure of the contract's notice (§5): types and enum values. Its rules
+    """The structure of the notice its publishers send: types and enum values. Its rules
     (lengths, patterns, required contacts) are the domain's."""
 
     notice_id: UUID

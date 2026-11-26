@@ -70,7 +70,7 @@ class Notice:
             raise InvalidNoticeError(errors)
 
     def outgoing(self, channel: Channel) -> OutgoingMessage:
-        """What the channel delivers: the body with the code in place (R2). It lives
+        """What the channel delivers: the body with the code in place. It lives
         only in memory; nothing recorded or logged comes from it."""
         return OutgoingMessage(
             destination=self.destination(channel),
@@ -80,7 +80,7 @@ class Notice:
 
     @property
     def recorded_body(self) -> str:
-        """The body for the record and the log: the code masked (R3)."""
+        """The body for the record and the log: the code masked."""
         return self._body_with(CODE_MASK)
 
     def _body_with(self, replacement: str | None) -> str:
